@@ -1,4 +1,5 @@
 {-# LANGUAGE OverloadedStrings #-}
+module System.Authinfo (readAuthinfo, getPassword) where
 import System.Environment
 import Data.Attoparsec.Text hiding (take)
 import Data.List
@@ -10,6 +11,7 @@ import Network
 import Data.Maybe
 import Data.Char
 
+type Line = (T.Text, T.Text, T.Text, Maybe PortNumber)
 dropBack :: Int -> [a] -> [a]
 dropBack n l = take (length l - n) l
 
@@ -25,7 +27,7 @@ field = do p <- peekChar'
               else word
 
 -- parse line
-line :: Parser (T.Text, T.Text, T.Text, Maybe PortNumber)
+line :: Parser Line
 line = fmap (\(Just h, Just l, Just p, r) -> (h,l,p,r)) 
             (line' (Nothing,Nothing,Nothing,Nothing))
   where line' s@(h,l,p,r) = 
@@ -38,12 +40,14 @@ line = fmap (\(Just h, Just l, Just p, r) -> (h,l,p,r))
 
 file = many line
 
+-- |Parses whole authinfo file
+readAuthinfo :: IO [Line]
 readAuthinfo = do
   home <- getEnv "HOME"
   Right res <- fmap (parseOnly file) $ T.readFile $ home ++ "/.authinfo"
   return res
   
--- Gets password out of AuthInfo
+-- |Gets the given user info out of AuthInfo
 getPassword :: T.Text -> T.Text -> IO (Maybe (T.Text, Maybe PortNumber))
 getPassword host user =
   fmap (fmap (\(_,_,pass,port) -> (pass,port)) . 
